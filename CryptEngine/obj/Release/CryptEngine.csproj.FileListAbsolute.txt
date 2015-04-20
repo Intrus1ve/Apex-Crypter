@@ -1,0 +1,11 @@
+Y:\Crypt PE\cryptpe\CryptEngine\obj\Release\CryptEngine.csprojResolveAssemblyReference.cache
+Y:\Crypt PE\cryptpe\CryptEngine\obj\Release\CryptEngine.Properties.Resources.resources
+Y:\Crypt PE\cryptpe\CryptEngine\obj\Release\CryptEngine.csproj.GenerateResource.Cache
+Y:\Crypt PE\cryptpe\CryptEngine\obj\Release\CryptEngine.dll
+Y:\Crypt PE\cryptpe\CryptEngine\obj\Release\CryptEngine.pdb
+Z:\Crypt PE\cryptpe\CryptEngine\bin\Release\CryptEngine.dll
+Z:\Crypt PE\cryptpe\CryptEngine\bin\Release\CryptEngine.pdb
+Z:\Crypt PE\cryptpe\CryptEngine\obj\Release\CryptEngine.Properties.Resources.resources
+Z:\Crypt PE\cryptpe\CryptEngine\obj\Release\CryptEngine.csproj.GenerateResource.Cache
+Z:\Crypt PE\cryptpe\CryptEngine\obj\Release\CryptEngine.dll
+Z:\Crypt PE\cryptpe\CryptEngine\obj\Release\CryptEngine.pdb

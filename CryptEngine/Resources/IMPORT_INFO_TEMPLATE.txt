@@ -1,0 +1,16 @@
+
+#MODULENAME#_IMPORT_INFORMATION:
+	.MODULE_NAME: 
+		
+		db "#MODULENAME#", 0		
+		.str#FUNC#: db 0, 0, "#FUNC#", 0
+       
+	    .FUNCTION_NAME_LIST:
+			dd .str#FUNC#
+            dd 0
+       
+	    .FUNCTION_ADDRESS_LIST:
+            dd .#FUNC#
+       
+	    .FUNCTION_ADDRESSES:
+			.#FUNC#:     dd 0

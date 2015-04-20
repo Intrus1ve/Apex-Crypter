@@ -1,0 +1,7 @@
+Z:\Crypt PE\cryptpe\PEBuilder\bin\Debug\PEBuilder.dll
+Z:\Crypt PE\cryptpe\PEBuilder\bin\Debug\PEBuilder.pdb
+Z:\Crypt PE\cryptpe\PEBuilder\obj\Debug\PEBuilder.csprojResolveAssemblyReference.cache
+Z:\Crypt PE\cryptpe\PEBuilder\obj\Debug\PEBuilder.dll
+Z:\Crypt PE\cryptpe\PEBuilder\obj\Debug\PEBuilder.pdb
+Z:\Crypt PE\cryptpe\PEBuilder\obj\Debug\PEBuilder.Properties.Resources.resources
+Z:\Crypt PE\cryptpe\PEBuilder\obj\Debug\PEBuilder.csproj.GenerateResource.Cache
