@@ -1,0 +1,4 @@
+Z:\Crypt PE\cryptpe\PEBuilder\bin\Release\PEBuilder.dll
+Z:\Crypt PE\cryptpe\PEBuilder\bin\Release\PEBuilder.pdb
+Z:\Crypt PE\cryptpe\PEBuilder\obj\Release\PEBuilder.dll
+Z:\Crypt PE\cryptpe\PEBuilder\obj\Release\PEBuilder.pdb

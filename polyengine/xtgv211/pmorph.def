@@ -1,0 +1,2 @@
+LIBRARY pmorph 
+EXPORTS GenDecryptor 

