@@ -1,6 +1,0 @@
-skip_tags: true
-
-version: 0.{build}
-
-build_script:
-  - build all /p:Configuration=Release

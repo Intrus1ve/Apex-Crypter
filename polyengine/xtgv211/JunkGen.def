@@ -1,3 +1,0 @@
-LIBRARY JunkGen 
-EXPORTS GenJunk 
-EXPORTS GenJunkFPU

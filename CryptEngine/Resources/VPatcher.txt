@@ -1,1 +1,0 @@
-"[FilePath]" /va "[FileVersion]" /pv "[ProductVersion]" /s desc "[Description]" /s copyright "[Copyright]" /s company "[Company]" /s product "[ProductName]"
