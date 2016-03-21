@@ -7,6 +7,4 @@ May not compile because probably has references to the client/server communicati
 
 Have fun, this is probably the most powerful public source available.
 
-- Much love, Salmoneus (sal) + TraptCode (TC)
-
-This repo is free to be used by anyone who identifies themselves as human. This excludes furries and weaboos. Razar is also not permitted.
+- Much love to all those who have helped us and supported us along the way.
